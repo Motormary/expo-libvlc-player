@@ -9,6 +9,8 @@ import android.os.Looper
 import android.util.Size
 import android.view.PixelCopy
 import android.view.Surface
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.view.TextureView
 import android.view.ViewGroup
 import expo.modules.kotlin.AppContext
@@ -45,9 +47,11 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import org.videolan.libvlc.Dialog as VLCDialog
 
+// HDR Configuration - Use SurfaceView for proper HDR passthrough to TV
 private val DISPLAY_MANAGER: DisplayManager? = null
 private val ENABLE_SUBTITLES: Boolean = true
-private val USE_TEXTURE_VIEW: Boolean = true
+private val USE_TEXTURE_VIEW: Boolean = false  // SurfaceView for HDR passthrough (not TextureView)
+
 
 class LibVlcPlayerView(
     context: Context,
@@ -56,6 +60,9 @@ class LibVlcPlayerView(
     val playerLayout: VLCVideoLayout = VLCVideoLayout(context)
     val pictureLayout: VLCVideoLayout = VLCVideoLayout(context)
     private var pauseIfJob: Job? = null
+    
+    // SurfaceView holder for HDR
+    private var surfaceHolder: SurfaceHolder? = null
 
     var libVLC: LibVLC? = null
     var mediaPlayer: MediaPlayer? = null
@@ -98,17 +105,19 @@ class LibVlcPlayerView(
         detachPlayerLayout()
     }
 
-    override fun onSizeChanged(
-        w: Int,
-        h: Int,
-        oldw: Int,
-        oldh: Int,
-    ) {
-        super.onSizeChanged(w, h, oldw, oldh)
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+      super.onSizeChanged(w, h, oldw, oldh)
 
+      if (w <= 0 || h <= 0) return
+
+      // Post to end of queue so child views have resolved their own sizes
+      post {
         setContentFit(layout = playerLayout)
         setContentFit(layout = pictureLayout)
+      }
     }
+
+    fun getSurfaceView(layout: VLCVideoLayout): SurfaceView? = layout.findViewById(org.videolan.R.id.surface_video)
 
     fun getTextureView(layout: VLCVideoLayout): TextureView? = layout.findViewById(org.videolan.R.id.texture_video)
 
@@ -148,7 +157,30 @@ class LibVlcPlayerView(
             val attached = player.getVLCVout().areViewsAttached()
 
             if (!attached) {
+                // Attach with SurfaceView for HDR passthrough
                 player.attachViews(view, DISPLAY_MANAGER, ENABLE_SUBTITLES, USE_TEXTURE_VIEW)
+                
+                // Setup SurfaceHolder for HDR if using SurfaceView
+                if (!USE_TEXTURE_VIEW) {
+                    val surfaceView = getSurfaceView(view)
+                    if (surfaceView != null) {
+                        surfaceHolder = surfaceView.holder
+                        surfaceHolder?.addCallback(object : SurfaceHolder.Callback {
+                            override fun surfaceCreated(holder: SurfaceHolder) {
+                                // Surface ready for video output
+                            }
+
+                            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                                // Surface dimensions changed
+                            }
+
+                            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                                // Surface is being destroyed
+                                surfaceHolder = null
+                            }
+                        })
+                    }
+                }
             }
         }
     }
@@ -159,6 +191,11 @@ class LibVlcPlayerView(
 
             if (attached) {
                 player.detachViews()
+                
+                // Cleanup SurfaceHolder
+                if (surfaceHolder != null && !USE_TEXTURE_VIEW) {
+                    surfaceHolder = null
+                }
             }
         }
     }
@@ -175,6 +212,7 @@ class LibVlcPlayerView(
 
     fun createPlayer() {
         var args = options
+        
         args.toggleStartPausedOption(autoplay)
 
         if (pictureInPicture) {
@@ -212,6 +250,7 @@ class LibVlcPlayerView(
         libVLC = null
         mediaPlayer?.release()
         mediaPlayer = null
+        surfaceHolder = null
         removeAllViews()
     }
 
@@ -286,58 +325,106 @@ class LibVlcPlayerView(
     }
 
     fun setContentFit(layout: VLCVideoLayout) {
-        post {
-            val view = getTextureView(layout) ?: return@post
-            val matrix = Matrix()
+      post {
+        val surfaceView = getSurfaceView(layout)
+        val textureView = getTextureView(layout)
 
-            val video = getVideoSize()
+        val video = getVideoSize()
 
-            if (hasVideoSize) {
-                val viewWidth = view.width.toFloat()
-                val viewHeight = view.height.toFloat()
+        if (!hasVideoSize) return@post
 
-                val videoWidth = video.width.toFloat()
-                val videoHeight = video.height.toFloat()
+        val viewWidth = layout.width.toFloat()
+        val viewHeight = layout.height.toFloat()
 
-                val viewAspect = viewWidth / viewHeight
-                val videoAspect = videoWidth / videoHeight
+        if (viewWidth <= 0f || viewHeight <= 0f) return@post
 
-                val pivotX = viewWidth / 2f
-                val pivotY = viewHeight / 2f
+        val videoWidth = video.width.toFloat()
+        val videoHeight = video.height.toFloat()
 
-                when (contentFit) {
-                    VideoContentFit.CONTAIN -> {
-                        // No scale required
-                    }
+        val viewAspect = viewWidth / viewHeight
+        val videoAspect = videoWidth / videoHeight
 
-                    VideoContentFit.COVER -> {
-                        val scale =
-                            if (videoAspect > viewAspect) {
-                                videoAspect / viewAspect
-                            } else {
-                                viewAspect / videoAspect
-                            }
+        if (textureView != null) {
+          // TextureView path — matrix transform
+          val matrix = Matrix()
+          val pivotX = viewWidth / 2f
+          val pivotY = viewHeight / 2f
 
-                        matrix.setScale(scale, scale, pivotX, pivotY)
-                    }
-
-                    VideoContentFit.FILL -> {
-                        var scaleX = 1f
-                        var scaleY = 1f
-
-                        if (videoAspect > viewAspect) {
-                            scaleY = videoAspect / viewAspect
-                        } else {
-                            scaleX = viewAspect / videoAspect
-                        }
-
-                        matrix.setScale(scaleX, scaleY, pivotX, pivotY)
-                    }
-                }
+          when (contentFit) {
+            VideoContentFit.CONTAIN -> {
+              // VLC handles CONTAIN natively, reset to identity
             }
 
-            view.setTransform(matrix)
+            VideoContentFit.COVER -> {
+              val scale = if (videoAspect > viewAspect) {
+                videoAspect / viewAspect
+              } else {
+                viewAspect / videoAspect
+              }
+              matrix.setScale(scale, scale, pivotX, pivotY)
+            }
+
+            VideoContentFit.FILL -> {
+              var scaleX = 1f
+              var scaleY = 1f
+              if (videoAspect > viewAspect) {
+                scaleY = videoAspect / viewAspect
+              } else {
+                scaleX = viewAspect / videoAspect
+              }
+              matrix.setScale(scaleX, scaleY, pivotX, pivotY)
+            }
+          }
+
+          textureView.setTransform(matrix)
+
+        } else if (surfaceView != null) {
+          // SurfaceView path — adjust layout params to fake scaling
+          val lp = surfaceView.layoutParams ?: return@post
+
+          val targetWidth: Int
+          val targetHeight: Int
+
+          when (contentFit) {
+            VideoContentFit.CONTAIN -> {
+              if (videoAspect > viewAspect) {
+                targetWidth = viewWidth.toInt()
+                targetHeight = (viewWidth / videoAspect).toInt()
+              } else {
+                targetWidth = (viewHeight * videoAspect).toInt()
+                targetHeight = viewHeight.toInt()
+              }
+            }
+
+            VideoContentFit.COVER -> {
+              if (videoAspect > viewAspect) {
+                targetWidth = (viewHeight * videoAspect).toInt()
+                targetHeight = viewHeight.toInt()
+              } else {
+                targetWidth = viewWidth.toInt()
+                targetHeight = (viewWidth / videoAspect).toInt()
+              }
+            }
+
+            VideoContentFit.FILL -> {
+              targetWidth = viewWidth.toInt()
+              targetHeight = viewHeight.toInt()
+            }
+          }
+
+          lp.width = targetWidth
+          lp.height = targetHeight
+          surfaceView.layoutParams = lp
+
+          // Centre the surface within the layout
+          // if (surfaceView.layoutParams is ViewGroup.MarginLayoutParams) {
+          //   val mlp = surfaceView.layoutParams as ViewGroup.MarginLayoutParams
+          //   mlp.leftMargin = ((viewWidth - targetWidth) / 2f).toInt()
+          //   mlp.topMargin = ((viewHeight - targetHeight) / 2f).toInt()
+          //   surfaceView.layoutParams = mlp
+          // }
         }
+      }
     }
 
     fun setupPlayer() {
@@ -647,7 +734,17 @@ class LibVlcPlayerView(
 
     fun snapshot(path: String) {
         try {
-            val view = getTextureView(playerLayout) ?: throw Exception()
+            // Try SurfaceView first (HDR), fall back to TextureView
+            val surfaceView = getSurfaceView(playerLayout)
+            val textureView = getTextureView(playerLayout)
+            
+            if (surfaceView != null) {
+                // SurfaceView snapshots require different approach
+                onEncounteredError(mapOf("message" to "Snapshots not supported with HDR (SurfaceView)"))
+                return
+            }
+
+            val view = textureView ?: throw Exception()
 
             if (!hasVideoSize) throw Exception()
 
