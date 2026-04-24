@@ -124,6 +124,11 @@ class LibVlcPlayerModule : Module() {
                     view.pictureInPicture = pictureInPicture
                 }
 
+                 Prop("useTextureView", false) { view: LibVlcPlayerView, useTextureView: Boolean ->
+                  view.useTextureView = useTextureView
+                }
+
+
                 OnViewDidUpdateProps { view: LibVlcPlayerView ->
                     view.initPlayer()
                 }
@@ -143,10 +148,6 @@ class LibVlcPlayerModule : Module() {
 
                 AsyncFunction("stop") { view: LibVlcPlayerView ->
                     view.stop()
-                }
-                
-                AsyncFunction("updateSize") { view: LibVlcPlayerView, width: Int, height: Int ->
-                  view.updateSize(width, height)
                 }
 
                 AsyncFunction("seek") { view: LibVlcPlayerView, value: Double, type: String? ->
