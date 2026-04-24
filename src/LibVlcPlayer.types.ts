@@ -5,6 +5,18 @@ export type LibVlcPlayerModuleEvents = {};
 
 export interface LibVlcPlayerViewRef {
    /**
+   * Maximizes player
+   *
+   * @returns A promise which resolves to `void`
+   */
+  readonly maximize: () => Promise<void>;
+   /**
+   * minimizes player to screen / 3
+   *
+   * @returns A promise which resolves to `void`
+   */
+  readonly minimize: () => Promise<void>;
+   /**
    * Starts playback of the current player
    *
    * @returns A promise which resolves to `void`
