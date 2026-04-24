@@ -668,6 +668,11 @@ class LibVlcPlayerView(
         }
     }
 
+    fun updateSize(w: Int, h: Int) {
+      if (w <= 0 || h <= 0) return
+      mediaPlayer?.getVLCVout()?.setWindowSize(w, h)
+    }
+
     fun pause() {
         mediaPlayer?.pause()
     }
