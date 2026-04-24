@@ -144,6 +144,10 @@ class LibVlcPlayerModule : Module() {
                 AsyncFunction("stop") { view: LibVlcPlayerView ->
                     view.stop()
                 }
+                
+                AsyncFunction("updateSize") { view: LibVlcPlayerView, width: Int, height: Int ->
+                  view.updateSize(width, height)
+                }
 
                 AsyncFunction("seek") { view: LibVlcPlayerView, value: Double, type: String? ->
                     view.seek(value, type)
