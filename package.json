@@ -24,7 +24,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cornejobarraza/expo-libvlc-player.git"
+    "url": "git+https://github.com/Motormary/expo-libvlc-player.git"
   },
   "bugs": {
     "url": "https://github.com/cornejobarraza/expo-libvlc-player/issues"
