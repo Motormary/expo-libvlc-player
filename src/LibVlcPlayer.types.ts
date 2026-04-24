@@ -4,13 +4,7 @@ import type { ViewProps } from "react-native";
 export type LibVlcPlayerModuleEvents = {};
 
 export interface LibVlcPlayerViewRef {
-    /**
-   * Updates the size of the current player
-   *
-   * @returns A promise which resolves to `void`
-   */
-  readonly updateSize: (width: number, height: number) => Promise<void>;
-  /**
+   /**
    * Starts playback of the current player
    *
    * @returns A promise which resolves to `void`
@@ -265,6 +259,7 @@ export interface LibVlcPlayerViewNativeProps extends ViewProps {
   repeat?: boolean;
   autoplay?: boolean;
   pictureInPicture?: boolean;
+  useTextureView?: boolean;
   onBuffering?: BufferingListener;
   onPlaying?: PlayingListener;
   onPaused?: PausedListener;
