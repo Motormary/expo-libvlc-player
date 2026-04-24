@@ -425,6 +425,12 @@ export interface LibVlcPlayerViewProps extends ViewProps {
    * @default false
    */
   pictureInPicture?: boolean;
+   /**
+   * Determines whether the player should use Texture or Surface View
+   *
+   * @default false
+   */
+  useTextureView?: boolean;
   /**
    * Called after the `Buffering` player event
    */
