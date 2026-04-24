@@ -50,7 +50,7 @@ import org.videolan.libvlc.Dialog as VLCDialog
 // HDR Configuration - Use SurfaceView for proper HDR passthrough to TV
 private val DISPLAY_MANAGER: DisplayManager? = null
 private val ENABLE_SUBTITLES: Boolean = true
-private val USE_TEXTURE_VIEW: Boolean = false  // SurfaceView for HDR passthrough (not TextureView)
+//private val useTextureView: Boolean = false  // SurfaceView for HDR passthrough (not TextureView)
 
 
 class LibVlcPlayerView(
@@ -158,10 +158,10 @@ class LibVlcPlayerView(
 
             if (!attached) {
                 // Attach with SurfaceView for HDR passthrough
-                player.attachViews(view, DISPLAY_MANAGER, ENABLE_SUBTITLES, USE_TEXTURE_VIEW)
+                player.attachViews(view, DISPLAY_MANAGER, ENABLE_SUBTITLES, useTextureView)
                 
                 // Setup SurfaceHolder for HDR if using SurfaceView
-                if (!USE_TEXTURE_VIEW) {
+                if (!useTextureView) {
                     val surfaceView = getSurfaceView(view)
                     if (surfaceView != null) {
                         surfaceHolder = surfaceView.holder
@@ -193,7 +193,7 @@ class LibVlcPlayerView(
                 player.detachViews()
                 
                 // Cleanup SurfaceHolder
-                if (surfaceHolder != null && !USE_TEXTURE_VIEW) {
+                if (surfaceHolder != null && !useTextureView) {
                     surfaceHolder = null
                 }
             }
@@ -657,6 +657,13 @@ class LibVlcPlayerView(
             field = value
             shouldInit = true
         }
+    
+    var useTextureView: Boolean = false
+        set(value) {
+          field = value
+          shouldInit = true
+        }
+
 
     fun play() {
         mediaPlayer?.let { player ->
